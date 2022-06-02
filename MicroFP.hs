@@ -13,8 +13,16 @@ import Test.QuickCheck
 import Test.QuickCheck.All
 
 
+data Prog = Const Integer
+          | Var String
+          | Add Expr Expr
+          | Sub Expr Expr
+          | Mult Expr Expr
+          | If Cond Expr Expr
+          deriving (Show)
 
-
+data Cond = Cond Expr Expr
+          deriving (Show)
 
 -- QuickCheck: all prop_* tests
 return []
