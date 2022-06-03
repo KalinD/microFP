@@ -18,17 +18,17 @@ data Parser r = P {
 }
 
 instance Functor Parser where
-    fmap f (P p) = P (\input -> [(f v, res) | (v, res) <- p input])    
+    fmap f p = P (\input -> [(f v, res) | (v, res) <- runParser p input])
 
 instance Applicative Parser where
     pure p = (P (\input -> [(p, input)]))  
-    (P p1) <*> (P p2) = P (\input -> [(f v, res2) | (f, res1) <- p1 input, (v, res2) <- p2 res1])
+    p1 <*> p2 = P (\input -> [(f v, res2) | (f, res1) <- runParser p1 input, (v, res2) <- runParser p2 res1])
 
 char :: Char -> Parser Char
 char c = P p
     where
         p (Stream []) = []
-        p (Stream (x:xs)) | c == x = [(x, Stream(xs))]
+        p (Stream (x:xs)) | c == x = [(x, Stream xs)]
                           | otherwise = []
 
 failure :: Parser a
@@ -36,7 +36,7 @@ failure = P (\input -> [])
 
 instance Alternative Parser where
     empty = failure
-    (P p1) <|> (P p2) = P (\input -> case p1 input of
-            [] -> p2 input
-            otherwise -> p1 input
+    p1 <|> p2 = P (\input -> case runParser p1 input of
+            [] -> runParser p2 input
+            res -> res
         )
