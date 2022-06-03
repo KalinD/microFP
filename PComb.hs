@@ -45,7 +45,7 @@ failure :: Parser a
 failure = P (\input -> [])
 
 -- FP1.6
-exAlternative = runParser (char '1' <|> char 'a') (Stream "a1")
+altEx = runParser (char '1' <|> char 'a') (Stream "a1")
 instance Alternative Parser where
     empty = failure
     p1 <|> p2 = P (\input -> case runParser p1 input of
