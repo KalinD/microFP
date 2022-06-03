@@ -70,3 +70,19 @@ identifier = whitespace ((:)<$> lower <*> (many (lower <|> dig)))
         lletter = ['a'..'z']
         charArr = map (char) lletter
         lower   = foldl (<|>) empty charArr
+
+-- FP2.4
+integer :: Parser Integer
+integer = whitespace (read <$> (many dig))
+
+-- FP2.4
+symbol :: String -> Parser String
+symbol str = whitespace (string str)
+
+-- FP2.4
+parens :: Parser a -> Parser a
+parens p = between (char '(') p (char ')')
+
+-- FP2.4
+braces :: Parser a -> Parser a
+braces p = between (char '{') p (char '}')
