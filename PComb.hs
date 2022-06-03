@@ -13,17 +13,25 @@ import Test.QuickCheck
 data Stream = Stream [Char]
               deriving (Eq, Show)
 
+-- FP1.1
+-- Test: :t char 'a'
 data Parser r = P {
     runParser :: Stream -> [(r , Stream)]
 }
 
+-- FP1.2
+parserFunctorEx = runParser (toUpper <$> char 'a') (Stream "abc")
 instance Functor Parser where
     fmap f p = P (\input -> [(f v, res) | (v, res) <- runParser p input])
 
+-- FP1.5
+parserCombEx = runParser ((,) <$> char 'a' <*> char 'b') (Stream "abc")
 instance Applicative Parser where
     pure p = (P (\input -> [(p, input)]))  
     p1 <*> p2 = P (\input -> [(f v, res2) | (f, res1) <- runParser p1 input, (v, res2) <- runParser p2 res1])
 
+-- FP1.3
+charParserEx = runParser (char 'a') (Stream "abc")
 char :: Char -> Parser Char
 char c = P p
     where
@@ -31,9 +39,13 @@ char c = P p
         p (Stream (x:xs)) | c == x = [(x, Stream xs)]
                           | otherwise = []
 
+-- FP1.4
+failureEx = runParser (failure) (Stream "abc")
 failure :: Parser a
 failure = P (\input -> [])
 
+-- FP1.6
+exAlternative = runParser (char '1' <|> char 'a') (Stream "a1")
 instance Alternative Parser where
     empty = failure
     p1 <|> p2 = P (\input -> case runParser p1 input of
