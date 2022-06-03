@@ -1,6 +1,7 @@
 -- Add your names and student numbers to the following file. Do not change anything else, since it is parsed.
--- Student 1: Your Name (sxxxxxxx)
--- Student 2: Other Name (syyyyyyy)
+-- Student 1: Kalin Doychev (s2535645)
+-- Student 2: Tariq Riahi (s2619393)
+-- Student 3: Vincent Albertsson (s2247259)
 
 module PComb where
 import Control.Applicative
@@ -30,8 +31,6 @@ char c = P p
         p (Stream (x:xs)) | c == x = [(x, Stream(xs))]
                           | otherwise = []
 
--- The function failure :: Parser a is a parser that consumes no input and fails (pro-
--- duces no valid parsing result).
 failure :: Parser a
 failure = P (\input -> [])
 
