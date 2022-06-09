@@ -96,7 +96,7 @@ identifierEx3 = runParser identifier (Stream " A1 ")
 
 -- FP2.4
 integer :: Parser Integer
-integer = whitespace (read <$> (many dig))
+integer = whitespace (read <$> (some dig))
 integerEx1 = runParser integer (Stream "1")
 integerEx2 = runParser integer (Stream "10000")
 integerEx3 = runParser integer (Stream "abc")
