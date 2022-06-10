@@ -1,0 +1,11 @@
+fibonacci 0 := 0;
+fibonacci 1 := 1;
+fibonacci n := fibonacci (n-1) + fibonacci (n-2);
+
+fib n := if (n < 3) then {
+           1
+ 	 } else {
+	   fib (n-1) + fib (n-2)
+  	 };
+
+       

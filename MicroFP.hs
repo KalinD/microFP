@@ -90,11 +90,9 @@ microInc = (Actions [FunDef "inc" [] (FunCal "add" [(Val 1)])])
 microEleven :: Prog
 microEleven = (Actions [FunDef "eleven" [] (FunCal "inc" [(Val 10)])])
 
-
 -- FP3.3
 -- Given a program written in the form of the MicroFP EDSL, the pretty function
 -- will generate a string that represents the EDSL program
-
 prettyEx = putStr (pretty microFib)
 class Pretty a where
     pretty :: a -> String
@@ -142,7 +140,7 @@ bind (Id v) params values = case elemIndex (V v) params of
     (Just a) -> (Val (values!!a))
     Nothing  -> (Val 0) -- Not found
 
-
+evalEx = eval microFib "fib" [10]
 eval :: Prog -> String -> [Integer] -> Integer
 eval (Actions []) _ _ = -69 -- Error
 eval (Actions ((FunDef fname params expr):fs)) fcall values | fname == fcall = evalFunc (FunDef fname params expr) values
@@ -184,6 +182,7 @@ evalFunc (FunDef name ps e) vs = evalExpr e (FunDef name ps e) ps vs
 
 -- FP4.1
 -- Parsers for each of the types in our MicroFP EDSL definition
+parseProgEx = runParser parseProgram (Stream "add x y := x + y;")
 parseProgram :: Parser Prog
 parseProgram = (Actions <$> (some parseFunction))
 
@@ -191,9 +190,9 @@ parseFunction :: Parser FunDef
 parseFunction = (FunDef <$> identifier <*> (many parseParam) <*> (between (symbol ":=") parseExpr (symbol ";")))
 
 parseExpr :: Parser Expr
-parseExpr =  (Add <$> parseTerm <*> (symbol "+" *> parseExpr))
-         <|> (Sub <$> parseTerm <*> (symbol "-" *> parseExpr))
-         <|> parseTerm
+parseExpr =  (Add <$> whitespace parseTerm <*> (symbol "+" *> whitespace parseExpr))
+         <|> (Sub <$> whitespace parseTerm <*> (symbol "-" *> whitespace parseExpr))
+         <|> whitespace parseTerm
 
 parseParam :: Parser Param
 parseParam =  (V <$> identifier)
@@ -205,9 +204,9 @@ parseTerm =  (Mult <$> parseFactor <*> (symbol "*" *> parseTerm))
 
 parseFactor :: Parser Expr
 parseFactor =  (Val <$> integer)
+           <|> (IfExpr <$> (symbol "if" *> parens (parseCompare)) <*> (between (symbol "then") (braces parseExpr) (symbol "else")) <*> braces parseExpr)
            <|> (FunCal <$> identifier <*> parens (some parseExpr))
            <|> (Id <$> identifier)
-           <|> (IfExpr <$> (symbol "if" *> parens (parseCompare)) <*> (between (symbol "then") (braces parseExpr) (symbol "else")) <*> braces parseExpr)
            <|> parens parseExpr
 
 parseCompare :: Parser Compare
@@ -217,19 +216,41 @@ parseCompare =  (Bigger <$> (parseExpr <* symbol ">") <*> parseExpr)
 
 -- FP4.2
 -- Parses a program written as a string and translates it to the MicroFP EDSL
+compileEx = compile "double a := a*2;"
 compile :: String -> Prog
 compile input = fst (head (runParser parseProgram (Stream input)))
 
 -- FP4.3
--- Reads a file containing a program, compiles it with FP4.2, and evaluates it with FP3.4 and a
--- list of integers to return a single integer result. The last function is used if there is
--- more than one function in the file
+{- Reads a file containing a program, compiles it with FP4.2, and finally evaluates it with 
+ - FP3.4 and a list of integers to return a single integer result. The last function is used 
+ - if there is more than one function in the file
+ -}
+getFunctions :: Prog -> [FunDef]
+getFunctions (Actions funs) = funs
 
--- runFile :: FilePath -> [Integer] -> IO Integer
--- runFile filepath vals = 
---     where
---         progs = compile <$> (lines <$> readFile filepath)
+getFunctionName :: FunDef -> String
+getFunctionName (FunDef fname _ _) = fname
 
+{- fib.txt consists of:
+fibonacci 0 := 0;
+fibonacci 1 := 1;
+fibonacci n := fibonacci (n-1) + fibonacci (n-2);
+
+fib n := if (n < 3) then {
+           1
+ 	 } else {
+	   fib (n-1) + fib (n-2)
+  	 };
+-}
+{- The runFile function compiles the file to an Prog with many FunDef. Then it executes 
+ - the last one with the parameters given in vals ([Integer]) and returns the result.
+-}
+runFileEx = runFile "./fib.txt" [10]
+runFile :: FilePath -> [Integer] -> IO Integer
+runFile filepath vals = (\x y -> eval x y vals) <$> prog <*> fname
+    where 
+        prog = compile <$> (concat <$> (lines <$> readFile filepath))
+        fname = getFunctionName <$> (last <$> (getFunctions <$> prog))
 
 -- QuickCheck: all prop_* tests
 return []

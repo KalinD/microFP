@@ -44,7 +44,7 @@ betweenEx2 = runParser (between (char '<') (char 'a') (char '>')) (Stream "<b>")
 -- Test: runParser whitespace (char 'a') (Stream " a b ")
 whitespace :: Parser a -> Parser a
 whitespace p = between (many x) p (many x)
-    where x = char ' ' <|> char '\n'
+    where x = char ' ' <|> char '\n' <|> char '\t'
 whitespaceEx1 = runParser (whitespace (char 'a')) (Stream " a b ")
 whitespaceEx2 = runParser (whitespace (char 'a')) (Stream " ab ")
 whitespaceEx3 = runParser (whitespace (char 'b')) (Stream " a b ")
