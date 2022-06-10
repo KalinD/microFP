@@ -137,83 +137,50 @@ instance Pretty Expr where
 -- FP3.4
 -- Evaluates a Prog given in MicroFP EDSL format. The function, given as a string,
 -- is evaluated with a list of integers to return a single integer result
-class Bind a where
-    bind :: a -> [Param] -> [Integer] -> a
+bind :: Expr -> [Param] -> [Integer] -> Expr
+bind (Id v) params values = case elemIndex (V v) params of
+    (Just a) -> (Val (values!!a))
+    Nothing  -> (Val 0) -- Not found
 
-instance Bind Expr where
-    bind (Id v) params values = case elemIndex (V v) params of
-        (Just a) -> (Val (values!!a))
-        Nothing  -> (Val 0) -- Not found
---     bind (Val a) _ _ = (Val a)
---     bind (Add exp1 exp2) variables values = (Add (bind exp1 variables values) (bind exp2 variables values))
---     bind (Sub exp1 exp2) variables values = (Sub (bind exp1 variables values) (bind exp2 variables values))
---     bind (Mult exp1 exp2) variables values = (Mult (bind exp1 variables values) (bind exp2 variables values))
---     bind (FunCal name exprs) variables values = (FunCal name (fmap (\x -> bind x variables values) exprs))
---     bind (IfExpr compare exp1 exp2) variables values = (IfExpr (bind compare variables values) (bind exp1 variables values) (bind exp2 variables values))
 
--- instance Bind Compare where
---     bind (Smaller exp1 exp2) variables values = (Smaller (bind exp1 variables values) (bind exp2 variables values))
---     bind (Bigger exp1 exp2) variables values = (Bigger (bind exp1 variables values) (bind exp2 variables values))
---     bind (Equals exp1 exp2) variables values = (Equals (bind exp1 variables values) (bind exp2 variables values))
-
--- instance Bind FunDef where
---     bind (FunDef fun args exp) variables values = (FunDef fun args (bind exp variables values))
-
--- instance Bind Prog where
---     bind (Actions funcs) variables values = (Actions (map (\x -> bind x variables values) funcs)) 
-
--- instance Bind Param where
---     bind (V v) variables values = (V v)
---     bind (I i) variables values = (I i)
-    
 eval :: Prog -> String -> [Integer] -> Integer
 eval (Actions []) _ _ = -69 -- Error
 eval (Actions ((FunDef fname params expr):fs)) fcall values | fname == fcall = evalFunc (FunDef fname params expr) values
                                                             | otherwise      = eval (Actions fs) fcall values
 
 evalExpr :: Expr -> FunDef -> [Param] -> [Integer] -> Integer
-evalExpr (Id v) _ params values = value
-    where
-        (Val value) = bind (Id v) params values
+evalExpr (Id v) _ ps vs = value
+    where (Val value) = bind (Id v) ps vs
 evalExpr (Val value) _ _ _ = value
-evalExpr (Add e1 e2) f params values = v1 + v2
-    where
-        v1 = (evalExpr e1 f params values)
-        v2 = (evalExpr e2 f params values)
-evalExpr (Sub e1 e2) f params values = v1 - v2
-    where
-        v1 = (evalExpr e1 f params values)
-        v2 = (evalExpr e2 f params values)
-evalExpr (Mult e1 e2) f params values = v1 * v2
-    where
-        v1 = (evalExpr e1 f params values)
-        v2 = (evalExpr e2 f params values)
-evalExpr (FunCal str es) f params values = (evalFunc f (fmap (\x -> evalExpr x f params values) es))
-evalExpr (IfExpr compare e1 e2) f params values | evalCompare compare f params values = evalExpr e1 f params values
-                                                | otherwise                           = evalExpr e2 f params values
+evalExpr (Add e1 e2) f ps vs = v1 + v2
+    where v1 = (evalExpr e1 f ps vs)
+          v2 = (evalExpr e2 f ps vs)
+evalExpr (Sub e1 e2) f ps vs = v1 - v2
+    where v1 = (evalExpr e1 f ps vs)
+          v2 = (evalExpr e2 f ps vs)
+evalExpr (Mult e1 e2) f ps vs = v1 * v2
+    where v1 = (evalExpr e1 f ps vs)
+          v2 = (evalExpr e2 f ps vs)
+evalExpr (FunCal str es) f ps vs = (evalFunc f (fmap (\x -> evalExpr x f ps vs) es))
+evalExpr (IfExpr compare e1 e2) f ps vs | evalCompare compare f ps vs = evalExpr e1 f ps vs
+                                        | otherwise                   = evalExpr e2 f ps vs
 
 evalCompare :: Compare -> FunDef -> [Param] -> [Integer] -> Bool
-evalCompare (Smaller e1 e2) f params values = v1 < v2
+evalCompare (Smaller e1 e2) f ps vs = v1 < v2
     where
-        v1 = (evalExpr e1 f params values)
-        v2 = (evalExpr e2 f params values)
-evalCompare (Bigger e1 e2) f params values = v1 > v2
+        v1 = (evalExpr e1 f ps vs)
+        v2 = (evalExpr e2 f ps vs)
+evalCompare (Bigger e1 e2) f ps vs = v1 > v2
     where
-        v1 = (evalExpr e1 f params values)
-        v2 = (evalExpr e2 f params values)
-evalCompare (Equals e1 e2) f params values = v1 == v2
+        v1 = (evalExpr e1 f ps vs)
+        v2 = (evalExpr e2 f ps vs)
+evalCompare (Equals e1 e2) f ps vs = v1 == v2
     where
-        v1 = (evalExpr e1 f params values)
-        v2 = (evalExpr e2 f params values) 
+        v1 = (evalExpr e1 f ps vs)
+        v2 = (evalExpr e2 f ps vs) 
 
 evalFunc :: FunDef -> [Integer] -> Integer
-evalFunc (FunDef name params expr) values = evalExpr expr (FunDef name params expr) params values 
-
--- fibonacci 0 := 0;
--- fibonacci 1 := 1;
--- fibonacci n := fibonacci (n-1) + fibonacci (n-2);
--- eval microFibonacci "microFibonacci" [10]
--- [n] = [10]
+evalFunc (FunDef name ps e) vs = evalExpr e (FunDef name ps e) ps vs 
 
 -- FP4.1
 -- Parsers for each of the types in our MicroFP EDSL definition
