@@ -61,7 +61,7 @@ data Param = V String
 microFibonacci :: Prog
 microFibonacci = (Actions [FunDef "fibonacci" [I 0] (Val 0),
                   FunDef "fibonacci" [I 1] (Val 1),
-                  FunDef "f     ibonacci" [V "n"] (Add (FunCal "fibonacci" [(Sub (Id "n") (Val 1))]) (FunCal "fibonacci" [(Sub (Id "n") (Val 2))]))])
+                  FunDef "fibonacci" [V "n"] (Add (FunCal "fibonacci" [(Sub (Id "n") (Val 1))]) (FunCal "fibonacci" [(Sub (Id "n") (Val 2))]))])
 
 microFib :: Prog
 microFib = (Actions [FunDef "fib" [V "n"] 
@@ -132,53 +132,60 @@ instance Pretty Expr where
     pretty (IfExpr comp exp1 exp2) = "if(" ++ (pretty comp) ++ ") {\n" ++ pretty exp1 ++ "\n}\nelse {\n" ++ pretty exp2 ++ "\n}"
     
      
--- FP3.4
+-- FP3.4 with FP5.2
 -- Evaluates a Prog given in MicroFP EDSL format. The function, given as a string,
 -- is evaluated with a list of integers to return a single integer result
 bind :: Expr -> [Param] -> [Integer] -> Expr
 bind (Id v) params values = case elemIndex (V v) params of
     (Just a) -> (Val (values!!a))
-    Nothing  -> (Val 0) -- Not found
+    Nothing  -> error "Value not found"
 
-evalEx = eval microFib "fib" [10]
+evalEx1 = eval microFib "fib" [10]
+evalEx2 = eval microDiv "div" [999, 2]
 eval :: Prog -> String -> [Integer] -> Integer
-eval (Actions []) _ _ = -69 -- Error
-eval (Actions ((FunDef fname params expr):fs)) fcall values | fname == fcall = evalFunc (FunDef fname params expr) values
-                                                            | otherwise      = eval (Actions fs) fcall values
+eval (Actions []) _ _ = error "No functions found" -- Error
+eval prog fname values
+        | (length nameAndValueMatch) > 0 = (trace("trying function with match: " ++ fname))evalFunc (head nameAndValueMatch) prog values
+        | otherwise                      = (trace("trying function: " ++ fname))evalFunc lastNameMatch prog values
+    where
+        functions = getFunctions prog
+        nameFiltered = filter (\(FunDef name params expr) -> name == fname) functions
+        nameAndValueMatch = filter (\(FunDef name params expr) -> (I <$> values) == params) nameFiltered
+        lastNameMatch = last nameFiltered
 
-evalExpr :: Expr -> FunDef -> [Param] -> [Integer] -> Integer
+evalExpr :: Expr -> Prog -> [Param] -> [Integer] -> Integer
 evalExpr (Id v) _ ps vs = value
     where (Val value) = bind (Id v) ps vs
 evalExpr (Val value) _ _ _ = value
-evalExpr (Add e1 e2) f ps vs = v1 + v2
-    where v1 = (evalExpr e1 f ps vs)
-          v2 = (evalExpr e2 f ps vs)
-evalExpr (Sub e1 e2) f ps vs = v1 - v2
-    where v1 = (evalExpr e1 f ps vs)
-          v2 = (evalExpr e2 f ps vs)
-evalExpr (Mult e1 e2) f ps vs = v1 * v2
-    where v1 = (evalExpr e1 f ps vs)
-          v2 = (evalExpr e2 f ps vs)
-evalExpr (FunCal str es) f ps vs = (evalFunc f (fmap (\x -> evalExpr x f ps vs) es))
-evalExpr (IfExpr compare e1 e2) f ps vs | evalCompare compare f ps vs = evalExpr e1 f ps vs
-                                        | otherwise                   = evalExpr e2 f ps vs
+evalExpr (Add e1 e2) p ps vs = v1 + v2
+    where v1 = (evalExpr e1 p ps vs)
+          v2 = (evalExpr e2 p ps vs)
+evalExpr (Sub e1 e2) p ps vs = v1 - v2
+    where v1 = (evalExpr e1 p ps vs)
+          v2 = (evalExpr e2 p ps vs)
+evalExpr (Mult e1 e2) p ps vs = v1 * v2
+    where v1 = (evalExpr e1 p ps vs)
+          v2 = (evalExpr e2 p ps vs)
+evalExpr (FunCal fname es) p ps vs = (eval p fname (fmap (\x -> evalExpr x p ps vs) es))
+evalExpr (IfExpr compare e1 e2) p ps vs | evalCompare compare p ps vs = evalExpr e1 p ps vs
+                                        | otherwise                   = evalExpr e2 p ps vs
 
-evalCompare :: Compare -> FunDef -> [Param] -> [Integer] -> Bool
-evalCompare (Smaller e1 e2) f ps vs = v1 < v2
+evalCompare :: Compare -> Prog -> [Param] -> [Integer] -> Bool
+evalCompare (Smaller e1 e2) p ps vs = v1 < v2
     where
-        v1 = (evalExpr e1 f ps vs)
-        v2 = (evalExpr e2 f ps vs)
-evalCompare (Bigger e1 e2) f ps vs = v1 > v2
+        v1 = (evalExpr e1 p ps vs)
+        v2 = (evalExpr e2 p ps vs)
+evalCompare (Bigger e1 e2) p ps vs = v1 > v2
     where
-        v1 = (evalExpr e1 f ps vs)
-        v2 = (evalExpr e2 f ps vs)
-evalCompare (Equals e1 e2) f ps vs = v1 == v2
+        v1 = (evalExpr e1 p ps vs)
+        v2 = (evalExpr e2 p ps vs)
+evalCompare (Equals e1 e2) p ps vs = v1 == v2
     where
-        v1 = (evalExpr e1 f ps vs)
-        v2 = (evalExpr e2 f ps vs) 
+        v1 = (evalExpr e1 p ps vs)
+        v2 = (evalExpr e2 p ps vs) 
 
-evalFunc :: FunDef -> [Integer] -> Integer
-evalFunc (FunDef name ps e) vs = evalExpr e (FunDef name ps e) ps vs 
+evalFunc :: FunDef -> Prog -> [Integer] -> Integer
+evalFunc (FunDef name ps e) p vs = evalExpr e p ps vs 
 
 -- FP4.1
 -- Parsers for each of the types in our MicroFP EDSL definition
@@ -203,8 +210,8 @@ parseTerm =  (Mult <$> parseFactor <*> (symbol "*" *> parseTerm))
          <|> parseFactor
 
 parseFactor :: Parser Expr
-parseFactor =  (Val <$> integer)
-           <|> (IfExpr <$> (symbol "if" *> parens (parseCompare)) <*> (between (symbol "then") (braces parseExpr) (symbol "else")) <*> braces parseExpr)
+parseFactor =  (IfExpr <$> (symbol "if" *> parens (parseCompare)) <*> (between (symbol "then") (braces parseExpr) (symbol "else")) <*> braces parseExpr)
+           <|> (Val <$> integer)
            <|> (FunCal <$> identifier <*> parens (some parseExpr))
            <|> (Id <$> identifier)
            <|> parens parseExpr
