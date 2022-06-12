@@ -145,8 +145,8 @@ evalEx2 = eval microDiv "div" [999, 2]
 eval :: Prog -> String -> [Integer] -> Integer
 eval (Actions []) _ _ = error "No functions found" -- Error
 eval prog fname values
-        | (length nameAndValueMatch) > 0 = (trace("trying function with match: " ++ fname))evalFunc (head nameAndValueMatch) prog values
-        | otherwise                      = (trace("trying function: " ++ fname))evalFunc lastNameMatch prog values
+        | (length nameAndValueMatch) > 0 = evalFunc (head nameAndValueMatch) prog values
+        | otherwise                      = evalFunc lastNameMatch prog values
     where
         functions = getFunctions prog
         nameFiltered = filter (\(FunDef name params expr) -> name == fname) functions
@@ -210,9 +210,9 @@ parseTerm =  (Mult <$> parseFactor <*> (symbol "*" *> parseTerm))
          <|> parseFactor
 
 parseFactor :: Parser Expr
-parseFactor =  (IfExpr <$> (symbol "if" *> parens (parseCompare)) <*> (between (symbol "then") (braces parseExpr) (symbol "else")) <*> braces parseExpr)
-           <|> (Val <$> integer)
-           <|> (FunCal <$> identifier <*> parens (some parseExpr))
+parseFactor =  (Val <$> integer)
+           <|> (IfExpr <$> (symbol "if" *> parens (parseCompare)) <*> (between (symbol "then") (braces parseExpr) (symbol "else")) <*> braces parseExpr)
+           <|> (FunCal <$> identifier <*> parens (sep1 parseExpr (char ',')))
            <|> (Id <$> identifier)
            <|> parens parseExpr
 
