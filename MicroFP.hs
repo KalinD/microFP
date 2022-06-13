@@ -132,7 +132,7 @@ instance Pretty Expr where
     pretty (IfExpr comp exp1 exp2) = "if(" ++ (pretty comp) ++ ") {\n" ++ pretty exp1 ++ "\n}\nelse {\n" ++ pretty exp2 ++ "\n}"
     
      
--- FP3.4 with FP5.2
+-- FP3.4 with FP5.2 and FP5.4
 -- Evaluates a Prog given in MicroFP EDSL format. The function, given as a string,
 -- is evaluated with a list of integers to return a single integer result
 bind :: Expr -> [Param] -> [Integer] -> Expr
@@ -166,9 +166,22 @@ evalExpr (Sub e1 e2) p ps vs = v1 - v2
 evalExpr (Mult e1 e2) p ps vs = v1 * v2
     where v1 = (evalExpr e1 p ps vs)
           v2 = (evalExpr e2 p ps vs)
-evalExpr (FunCal fname es) p ps vs = (eval p fname (fmap (\x -> evalExpr x p ps vs) es))
+evalExpr (FunCal fname es) p ps vs | argsCount == paramsCount = (eval p fname (fmap (\x -> evalExpr x p ps vs) es))
+                                   | otherwise                = (eval p fname (fmap (\x -> evalExpr x p ps vs) (es++newArgs)))
+    where
+        argsCount = getNumberOfArguments p fname
+        paramsCount = length es
+        newArgs = (fmap (\x -> Val x) vs)
 evalExpr (IfExpr compare e1 e2) p ps vs | evalCompare compare p ps vs = evalExpr e1 p ps vs
                                         | otherwise                   = evalExpr e2 p ps vs
+
+getNumberOfArguments :: Prog -> String -> Int
+getNumberOfArguments prog fname = length args
+    where
+        functions = getFunctions prog
+        (FunDef _ args _) = head (filter (\(FunDef name params expr) -> name == fname) functions)
+
+
 
 evalCompare :: Compare -> Prog -> [Param] -> [Integer] -> Bool
 evalCompare (Smaller e1 e2) p ps vs = v1 < v2
