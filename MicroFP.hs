@@ -92,7 +92,7 @@ microEleven = (Actions [FunDef "eleven" [] (FunCal "inc" [(Val 10)])])
 
 -- FP3.3
 -- Given a program written in the form of the MicroFP EDSL, the pretty function
--- will generate a string that represents the EDSL program
+-- will generate a string that represents the EDSL program in a easier to read format.
 prettyEx = putStr (pretty microFib)
 class Pretty a where
     pretty :: a -> String
@@ -106,18 +106,21 @@ instance Pretty Compare where
     pretty (Bigger exp1 exp2) = pretty exp1 ++ " > " ++ pretty exp2
     pretty (Equals exp1 exp2) = pretty exp1 ++ " == " ++ pretty exp2
 
+-- Helper function to display parameters of a function with a specific separator 
 prettyWithSep' :: [Param] -> String -> String
+prettyWithSep' [] _ = ""
 prettyWithSep' (e:[]) _ = pretty e
 prettyWithSep' (e:es) sep = pretty e ++ sep ++ prettyWithSep' es sep
 
 instance Pretty FunDef where
-    pretty (FunDef fun args exp) = fun ++ " " ++ prettyWithSep' args " " ++ " = " ++ pretty exp
-    -- pretty (FunDef fun args exp) = fun ++ " " ++ (map () args) ++ " = " ++ pretty exp
+    pretty (FunDef fun args exp) = fun ++ " " ++ prettyWithSep' args " " ++ " := " ++ pretty exp ++ ";"
 
 instance Pretty Param where
     pretty (V v) = v
     pretty (I i) = show i
 
+-- Helper function to display expressions with a specific separator. Really useful 
+-- to print function calls with multiple arguments.
 prettyWithSep :: [Expr] -> String -> String
 prettyWithSep (e:[]) _ = pretty e
 prettyWithSep (e:es) sep = pretty e ++ sep ++ prettyWithSep es sep
@@ -129,17 +132,18 @@ instance Pretty Expr where
     pretty (Val v) = show v
     pretty (Id v) = v
     pretty (FunCal name es) = name ++ "(" ++ (prettyWithSep es ", ") ++ ")"
-    pretty (IfExpr comp exp1 exp2) = "if(" ++ (pretty comp) ++ ") {\n" ++ pretty exp1 ++ "\n}\nelse {\n" ++ pretty exp2 ++ "\n}"
+    pretty (IfExpr comp exp1 exp2) = "if(" ++ (pretty comp) ++ ") then {\n" ++ pretty exp1 ++ "\n}\nelse {\n" ++ pretty exp2 ++ "\n}"
     
      
 -- FP3.4 with FP5.2 and FP5.4
--- Evaluates a Prog given in MicroFP EDSL format. The function, given as a string,
--- is evaluated with a list of integers to return a single integer result
+-- Helps tansform variables into values for easier calculations.
 bind :: Expr -> [Param] -> [Integer] -> Expr
 bind (Id v) params values = case elemIndex (V v) params of
     (Just a) -> (Val (values!!a))
     Nothing  -> error "Value not found"
 
+-- Evaluates a Prog given in MicroFP EDSL format. The function, given as a string,
+-- is evaluated with a list of integers to return a single integer result
 evalEx1 = eval microFib "fib" [10]
 evalEx2 = eval microDiv "div" [999, 2]
 eval :: Prog -> String -> [Integer] -> Integer
@@ -153,6 +157,7 @@ eval prog fname values
         nameAndValueMatch = filter (\(FunDef name params expr) -> (I <$> values) == params) nameFiltered
         lastNameMatch = last nameFiltered
 
+-- Evaluates expressions to their actual integer value
 evalExpr :: Expr -> Prog -> [Param] -> [Integer] -> Integer
 evalExpr (Id v) _ ps vs = value
     where (Val value) = bind (Id v) ps vs
@@ -175,14 +180,14 @@ evalExpr (FunCal fname es) p ps vs | argsCount == paramsCount = (eval p fname (f
 evalExpr (IfExpr compare e1 e2) p ps vs | evalCompare compare p ps vs = evalExpr e1 p ps vs
                                         | otherwise                   = evalExpr e2 p ps vs
 
+-- Helps get the number of arguments a function definition has for a given program. 
 getNumberOfArguments :: Prog -> String -> Int
 getNumberOfArguments prog fname = length args
     where
         functions = getFunctions prog
         (FunDef _ args _) = head (filter (\(FunDef name params expr) -> name == fname) functions)
 
-
-
+-- Evaluates a compare data type and turns it into a boolean.
 evalCompare :: Compare -> Prog -> [Param] -> [Integer] -> Bool
 evalCompare (Smaller e1 e2) p ps vs = v1 < v2
     where
@@ -197,6 +202,7 @@ evalCompare (Equals e1 e2) p ps vs = v1 == v2
         v1 = (evalExpr e1 p ps vs)
         v2 = (evalExpr e2 p ps vs) 
 
+-- Evaluate a function definition by ecaluating its definition.
 evalFunc :: FunDef -> Prog -> [Integer] -> Integer
 evalFunc (FunDef name ps e) p vs = evalExpr e p ps vs 
 
@@ -234,11 +240,34 @@ parseCompare =  (Bigger <$> (parseExpr <* symbol ">") <*> parseExpr)
             <|> (Smaller <$> (parseExpr <* symbol "<") <*> parseExpr)
             <|> (Equals <$> (parseExpr <* symbol "==") <*> parseExpr)
 
+-- Pattern matching function that combines multiple definitions of the
+-- same function into a single one by using "if" statements.
+patmatch :: Prog -> Prog
+patmatch p = (Actions result)
+    where
+        functions = getFunctions p
+        groupedByName = groupBy (\(FunDef name1 _ _) (FunDef name2 _ _) -> name1 == name2) functions
+        midResult = fmap combineFunctions groupedByName
+        lastOfEach = fmap last groupedByName
+        lastNameOfEach = fmap (\(FunDef name _ _) -> name) lastOfEach
+        lastArgOfEach = fmap (\(FunDef _ args _) -> args) lastOfEach
+        result = zipWith3 (\name args expr -> (FunDef name args expr))  lastNameOfEach lastArgOfEach midResult
+
+-- Helper function to actually combine the function definitions into a single expression.
+combineFunctions :: [FunDef] -> Expr
+combineFunctions ((FunDef _ _ e):[]) = e
+combineFunctions ((FunDef name args exp):fs) =
+    (IfExpr (Equals (Id argName) (Val val)) exp (combineFunctions fs))  
+    where
+        (FunDef _ argsLast _) = last fs
+        (V argName) = head argsLast 
+        (I val) = args!!0
+
 -- FP4.2
 -- Parses a program written as a string and translates it to the MicroFP EDSL
 compileEx = compile "double a := a*2;"
 compile :: String -> Prog
-compile input = fst (head (runParser parseProgram (Stream input)))
+compile input = patmatch (fst (head (runParser parseProgram (Stream input))))
 
 -- FP4.3
 {- Reads a file containing a program, compiles it with FP4.2, and finally evaluates it with 
@@ -248,6 +277,7 @@ compile input = fst (head (runParser parseProgram (Stream input)))
 getFunctions :: Prog -> [FunDef]
 getFunctions (Actions funs) = funs
 
+-- Returns the name of the functions
 getFunctionName :: FunDef -> String
 getFunctionName (FunDef fname _ _) = fname
 

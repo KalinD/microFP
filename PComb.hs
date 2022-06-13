@@ -14,23 +14,20 @@ data Stream = Stream [Char]
               deriving (Eq, Show)
 
 -- FP1.1
+-- Parser datatype which receives a stream and gives a result of type r
 -- Test: :t char 'a'
 data Parser r = P {
     runParser :: Stream -> [(r , Stream)]
 }
 
 -- FP1.2
+-- Functor instance of Parser
 parserFunctorEx = runParser (toUpper <$> char 'a') (Stream "abc")
 instance Functor Parser where
     fmap f p = P (\input -> [(f v, res) | (v, res) <- runParser p input])
 
--- FP1.5
-parserCombEx = runParser ((,) <$> char 'a' <*> char 'b') (Stream "abc")
-instance Applicative Parser where
-    pure p = (P (\input -> [(p, input)]))  
-    p1 <*> p2 = P (\input -> [(f v, res2) | (f, res1) <- runParser p1 input, (v, res2) <- runParser p2 res1])
-
 -- FP1.3
+-- A simple parser that parses a single character
 charParserEx = runParser (char 'a') (Stream "abc")
 char :: Char -> Parser Char
 char c = P p
@@ -40,11 +37,21 @@ char c = P p
                           | otherwise = []
 
 -- FP1.4
+-- A parser that fails and consumes no input
 failureEx = runParser (failure) (Stream "abc")
 failure :: Parser a
 failure = P (\input -> [])
 
+-- FP1.5
+-- Applicative instance of Parser
+parserCombEx = runParser ((,) <$> char 'a' <*> char 'b') (Stream "abc")
+instance Applicative Parser where
+    pure p = (P (\input -> [(p, input)]))  
+    p1 <*> p2 = P (\input -> [(f v, res2) | (f, res1) <- runParser p1 input, (v, res2) <- runParser p2 res1])
+
 -- FP1.6
+-- Alternative instance of parser such that it tries as few 
+-- alternatives as possible
 altEx = runParser (char '1' <|> char 'a') (Stream "a1")
 instance Alternative Parser where
     empty = failure

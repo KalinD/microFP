@@ -7,5 +7,3 @@ fib n := if (n < 3) then {
  	 } else {
 	   fib (n-1) + fib (n-2)
   	 };
-
-       
